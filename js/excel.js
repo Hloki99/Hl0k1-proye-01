@@ -3,49 +3,58 @@ let registrosLeidosDelExcel = [];
 let datosExcelA = null;
 let datosExcelB = null;
 
-// Detector Excel Principal
-document.getElementById('input-excel').addEventListener('change', function(e) {
-    const archivo = e.target.files[0];
-    if (!archivo) return;
-    const lector = new FileReader();
-    lector.onload = function(evento) {
-        const datos = new Uint8Array(evento.target.result);
-        const libro = XLSX.read(datos, { type: 'array' });
-        registrosLeidosDelExcel = XLSX.utils.sheet_to_json(libro.Sheets[libro.SheetNames[0]]);
-        if(registrosLeidosDelExcel.length > 0) {
-            document.getElementById('info-archivo').innerHTML = `
-                <p class="text-green-600 font-bold">📄 ${archivo.name}</p>
-                <p class="text-gray-700">📊 Filas leídas: ${registrosLeidosDelExcel.length}</p>
-            `;
-            mostrarNotificacion("Archivo cargado temporalmente.", "success");
-        }
-    };
-    lector.readAsArrayBuffer(archivo);
-});
+// Esperar a que cargue el DOM para asignar los eventos
+document.addEventListener('DOMContentLoaded', () => {
+    const inputExcel = document.getElementById('input-excel');
+    if (inputExcel) {
+        inputExcel.addEventListener('change', function(e) {
+            const archivo = e.target.files[0];
+            if (!archivo) return;
+            const lector = new FileReader();
+            lector.onload = function(evento) {
+                const datos = new Uint8Array(evento.target.result);
+                const libro = XLSX.read(datos, { type: 'array' });
+                registrosLeidosDelExcel = XLSX.utils.sheet_to_json(libro.Sheets[libro.SheetNames[0]]);
+                if(registrosLeidosDelExcel.length > 0) {
+                    document.getElementById('info-archivo').innerHTML = `
+                        <p class="text-green-600 font-bold">📄 ${archivo.name}</p>
+                        <p class="text-gray-700">📊 Filas leídas: ${registrosLeidosDelExcel.length}</p>
+                    `;
+                }
+            };
+            lector.readAsArrayBuffer(archivo);
+        });
+    }
 
-// Detectores para Comparador
-document.getElementById('excel-comp-a').addEventListener('change', function(e) {
-    const archivo = e.target.files[0];
-    if (!archivo) return;
-    document.getElementById('label-comp-a').innerText = archivo.name;
-    const lector = new FileReader();
-    lector.onload = function(ev) {
-        const libro = XLSX.read(new Uint8Array(ev.target.result), { type: 'array' });
-        datosExcelA = XLSX.utils.sheet_to_json(libro.Sheets[libro.SheetNames[0]], { raw: false });
-    };
-    lector.readAsArrayBuffer(archivo);
-});
+    const compA = document.getElementById('excel-comp-a');
+    if (compA) {
+        compA.addEventListener('change', function(e) {
+            const archivo = e.target.files[0];
+            if (!archivo) return;
+            document.getElementById('label-comp-a').innerText = archivo.name;
+            const lector = new FileReader();
+            lector.onload = function(ev) {
+                const libro = XLSX.read(new Uint8Array(ev.target.result), { type: 'array' });
+                datosExcelA = XLSX.utils.sheet_to_json(libro.Sheets[libro.SheetNames[0]], { raw: false });
+            };
+            lector.readAsArrayBuffer(archivo);
+        });
+    }
 
-document.getElementById('excel-comp-b').addEventListener('change', function(e) {
-    const archivo = e.target.files[0];
-    if (!archivo) return;
-    document.getElementById('label-comp-b').innerText = archivo.name;
-    const lector = new FileReader();
-    lector.onload = function(ev) {
-        const libro = XLSX.read(new Uint8Array(ev.target.result), { type: 'array' });
-        datosExcelB = XLSX.utils.sheet_to_json(libro.Sheets[libro.SheetNames[0]], { raw: false });
-    };
-    lector.readAsArrayBuffer(archivo);
+    const compB = document.getElementById('excel-comp-b');
+    if (compB) {
+        compB.addEventListener('change', function(e) {
+            const archivo = e.target.files[0];
+            if (!archivo) return;
+            document.getElementById('label-comp-b').innerText = archivo.name;
+            const lector = new FileReader();
+            lector.onload = function(ev) {
+                const libro = XLSX.read(new Uint8Array(ev.target.result), { type: 'array' });
+                datosExcelB = XLSX.utils.sheet_to_json(libro.Sheets[libro.SheetNames[0]], { raw: false });
+            };
+            lector.readAsArrayBuffer(archivo);
+        });
+    }
 });
 
 function procesarYGuardarTodo() {
@@ -72,7 +81,7 @@ function procesarYGuardarTodo() {
     });
 
     transaccion.oncomplete = function() {
-        mostrarNotificacion(`Se cargaron ${guardados} registros en bloque.`, "success");
+        alert(`Se cargaron ${guardados} registros en bloque.`);
         renderizarTablaDesdeDB();
         cerrarTodosLosDrawers();
     };
@@ -111,6 +120,7 @@ function ejecutarComparacionIndependiente() {
 }
 
 function exportarBaseDatos() {
+    if (!baseDatosLocal) return alert("Base de datos no inicializada.");
     const transaccion = baseDatosLocal.transaction(["registros"], "readonly");
     let datosExport = [];
     transaccion.objectStore("registros").openCursor().onsuccess = function(e) {

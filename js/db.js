@@ -15,15 +15,22 @@ peticionDB.onupgradeneeded = function(e) {
 
 peticionDB.onsuccess = function(e) {
     baseDatosLocal = e.target.result;
-    mostrarNotificacion("Estructura de datos lista y blindada.", "success");
-    renderizarTablaDesdeDB();
-    document.getElementById('manual-fecha').value = new Date().toISOString().split('T')[0];
+    console.log("IndexedDB inicializada con éxito.");
+    if (typeof renderizarTablaDesdeDB === "function") {
+        renderizarTablaDesdeDB();
+    }
+    const campoFecha = document.getElementById('manual-fecha');
+    if (campoFecha) campoFecha.value = new Date().toISOString().split('T')[0];
+};
+
+peticionDB.onerror = function(e) {
+    console.error("Error al abrir IndexedDB:", e.target.error);
 };
 
 function limpiarTodaLaDB() {
     if(!confirm("Hermano, ¿seguro que quieres vaciar la tabla por completo?")) return;
     baseDatosLocal.transaction(["registros"], "readwrite").objectStore("registros").clear().onsuccess = function() {
-        mostrarNotificacion("Almacenamiento vaciado.", "success");
+        alert("Almacenamiento vaciado.");
         renderizarTablaDesdeDB();
         cerrarTodosLosDrawers();
     };
