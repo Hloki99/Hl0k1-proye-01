@@ -1,55 +1,119 @@
 // js/logica.js
 
 // ==========================================================================
-// 1. VARIABLES GLOBALES Y CONFIGURACIÓN DE BASE DE DATOS (Original db.js)
+// VARIABLES GLOBALES (Exactamente como las tienes en tu diseño)
 // ==========================================================================
-let baseDatosLocal;
 let registrosLeidosDelExcel = [];
 let datosExcelA = null;
 let datosExcelB = null;
+let baseDatosLocal;
 let modoEliminacionActivo = false;
 
+// ==========================================================================
+// FUNCIÓN DE NOTIFICACIONES (Apunta a tu div "zona-alerta")
+// ==========================================================================
+function mostrarNotificacion(mensaje, tipo = "info") {
+    const zonaAlerta = document.getElementById('zona-alerta');
+    if (zonaAlerta) {
+        const alerta = document.createElement('div');
+        alerta.className = `p-3 rounded-xl text-xs font-bold text-white shadow-md mb-4 text-center transition-all transform duration-300 ${
+            tipo === 'success' ? 'bg-emerald-600' : tipo === 'error' ? 'bg-rose-600' : 'bg-indigo-600'
+        }`;
+        alerta.innerText = mensaje;
+        zonaAlerta.appendChild(alerta);
+        
+        setTimeout(() => {
+            alerta.remove();
+        }, 3500);
+    } else {
+        alert(mensaje);
+    }
+}
+
+// ==========================================================================
+// INTERFAZ, SWITCHES Y CONTROL DE DRAWERS
+// ==========================================================================
+function alternarVisibilidadBorrado() {
+    modoEliminacionActivo = document.getElementById('switch-modo-borrar').checked;
+    const botonesBorrar = document.querySelectorAll('.btn-borrar-dinamico');
+    botonesBorrar.forEach(boton => {
+        if (modoEliminacionActivo) {
+            boton.classList.remove('hidden');
+        } else {
+            boton.classList.add('hidden');
+        }
+    });
+}
+
+function toggleDrawer(idDrawer) {
+    const panel = document.getElementById(idDrawer);
+    const overlay = document.getElementById('drawer-overlay');
+    const estaCerrado = panel.classList.contains('translate-x-full') || panel.classList.contains('-translate-x-full');
+    
+    cerrarTodosLosDrawers();
+
+    if (estaCerrado) {
+        if (idDrawer === 'drawer-importar') {
+            panel.classList.remove('translate-x-full');
+        } else {
+            panel.classList.remove('-translate-x-full');
+        }
+        overlay.classList.remove('hidden');
+        setTimeout(() => overlay.classList.add('opacity-100'), 10);
+    }
+}
+
+function cerrarTodosLosDrawers() {
+    document.getElementById('drawer-importar').classList.add('translate-x-full');
+    document.getElementById('drawer-comparar').classList.add('-translate-x-full');
+    document.getElementById('drawer-usuarios').classList.add('-translate-x-full');
+    const overlay = document.getElementById('drawer-overlay');
+    if (overlay) {
+        overlay.classList.remove('opacity-100');
+        setTimeout(() => overlay.classList.add('hidden'), 30);
+    }
+}
+
+function cambiarPestanaInterna(tipo) {
+    const btnForm = document.getElementById('tab-btn-form');
+    const btnTrash = document.getElementById('tab-btn-trash');
+    const conForm = document.getElementById('contenido-tab-form');
+    const conTrash = document.getElementById('contenido-tab-trash');
+
+    if (tipo === 'form') {
+        btnForm.className = "flex-1 py-2 text-center border-b-2 border-slate-800 text-slate-800 cursor-pointer font-bold";
+        btnTrash.className = "flex-1 py-2 text-center border-b-2 border-transparent text-gray-400 hover:text-gray-600 cursor-pointer";
+        conForm.classList.remove('hidden');
+        conTrash.classList.add('hidden');
+    } else {
+        btnTrash.className = "flex-1 py-2 text-center border-b-2 border-slate-800 text-slate-800 cursor-pointer font-bold";
+        btnForm.className = "flex-1 py-2 text-center border-b-2 border-transparent text-gray-400 hover:text-gray-600 cursor-pointer";
+        conTrash.classList.remove('hidden');
+        conForm.classList.add('hidden');
+        renderizarPapelera();
+    }
+}
+
+// ==========================================================================
+// INITIALIZACIÓN DE INDEXEDDB
+// ==========================================================================
 const peticionDB = indexedDB.open("ProcesadorExcelMasivoDB", 2);
 
 peticionDB.onupgradeneeded = function(e) {
     let db = e.target.result;
-    if (!db.objectStoreNames.contains("registros")) {
-        db.createObjectStore("registros", { keyPath: "cedula" });
-    }
-    if (!db.objectStoreNames.contains("registros_eliminados")) {
-        db.createObjectStore("registros_eliminados", { keyPath: "cedula" });
-    }
+    if (!db.objectStoreNames.contains("registros")) db.createObjectStore("registros", { keyPath: "cedula" });
+    if (!db.objectStoreNames.contains("registros_eliminados")) db.createObjectStore("registros_eliminados", { keyPath: "cedula" });
 };
 
 peticionDB.onsuccess = function(e) {
     baseDatosLocal = e.target.result;
-    console.log("IndexedDB inicializada con éxito.");
-    
-    // Ejecuta la carga inicial de la tabla
-    if (typeof renderizarTablaDesdeDB === "function") {
-        renderizarTablaDesdeDB();
-    }
-    
-    // Setea la fecha de hoy por defecto
-    const campoFecha = document.getElementById('manual-fecha');
-    if (campoFecha) campoFecha.value = new Date().toISOString().split('T')[0];
+    renderizarTablaDesdeDB();
+    const inputFecha = document.getElementById('manual-fecha');
+    if (inputFecha) inputFecha.value = new Date().toISOString().split('T')[0];
 };
-
-peticionDB.onerror = function(e) {
-    console.error("Error al abrir IndexedDB:", e.target.error);
-};
-
-function limpiarTodaLaDB() {
-    if(!confirm("Hermano, ¿seguro que quieres vaciar la tabla por completo?")) return;
-    baseDatosLocal.transaction(["registros"], "readwrite").objectStore("registros").clear().onsuccess = function() {
-        mostrarNotificacion("Almacenamiento vaciado.", "success");
-        renderizarTablaDesdeDB();
-        cerrarTodosLosDrawers();
-    };
-}
 
 // ==========================================================================
-// 2. PROCESAMIENTO DE EXCEL (Original excel.js)
+// CONTROLADORES DE ARCHIVOS EXCEL (Conectados por ID al DOM)
 // ==========================================================================
 document.addEventListener('DOMContentLoaded', () => {
     const inputExcel = document.getElementById('input-excel');
@@ -67,6 +131,7 @@ document.addEventListener('DOMContentLoaded', () => {
                         <p class="text-green-600 font-bold">📄 ${archivo.name}</p>
                         <p class="text-gray-700">📊 Filas leídas: ${registrosLeidosDelExcel.length}</p>
                     `;
+                    mostrarNotificacion("Archivo cargado al lector temporal.", "success");
                 }
             };
             lector.readAsArrayBuffer(archivo);
@@ -104,6 +169,9 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 });
 
+// ==========================================================================
+// OPERACIONES PRINCIPALES: EXCEL Y BASE DE DATOS
+// ==========================================================================
 function procesarYGuardarTodo() {
     if (registrosLeidosDelExcel.length === 0) return alert("Hermano, primero selecciona un archivo Excel Principal.");
     const transaccion = baseDatosLocal.transaction(["registros"], "readwrite");
@@ -187,93 +255,111 @@ function exportarBaseDatos() {
     };
 }
 
-// ==========================================================================
-// 3. INTERFAZ VISUAL, DRAWERS Y NOTIFICACIONES (Original interfaz.js)
-// ==========================================================================
-function mostrarNotificacion(mensaje, tipo = "info") {
-    // Si tienes un contenedor flotante para alertas visuales lo creará aquí,
-    // si no, usará un alert clásico para que el sistema nunca deje de responder.
-    const contenedorNotificaciones = document.getElementById('contenedor-notificaciones');
-    if (contenedorNotificaciones) {
-        const alerteEl = document.createElement('div');
-        alerteEl.className = `p-3 rounded-lg shadow-md text-white font-medium text-xs mb-2 transition-all duration-300 transform translate-y-2 opacity-0 ${tipo === 'success' ? 'bg-emerald-600' : tipo === 'error' ? 'bg-rose-600' : 'bg-indigo-600'}`;
-        alerteEl.innerText = mensaje;
-        contenedorNotificaciones.appendChild(alerteEl);
-        setTimeout(() => { alerteEl.classList.remove('translate-y-2', 'opacity-0'); }, 10);
-        setTimeout(() => {
-            alerteEl.classList.add('translate-y-2', 'opacity-0');
-            setTimeout(() => alerteEl.remove(), 300);
-        }, 3500);
-    } else {
-        alert(mensaje);
-    }
+function limpiarTodaLaDB() {
+    if(!confirm("Hermano, ¿seguro que quieres vaciar la tabla por completo?")) return;
+    baseDatosLocal.transaction(["registros"], "readwrite").objectStore("registros").clear().onsuccess = function() {
+        mostrarNotificacion("Almacenamiento vaciado.", "success");
+        renderizarTablaDesdeDB();
+        cerrarTodosLosDrawers();
+    };
 }
 
-function alternarVisibilidadBorrado() {
-    modoEliminacionActivo = document.getElementById('switch-modo-borrar').checked;
-    const botonesBorrar = document.querySelectorAll('.btn-borrar-dinamico');
-    botonesBorrar.forEach(boton => {
-        if (modoEliminacionActivo) boton.classList.remove('hidden');
-        else boton.classList.add('hidden');
-    });
+// ==========================================================================
+// GESTIÓN MANUAL Y RENDERIZADO (Originales del script)
+// ==========================================================================
+function guardarPersonaManual() {
+    const cedula = document.getElementById('manual-cedula').value.trim();
+    const nombre = document.getElementById('manual-nombre').value.trim();
+    const status = document.getElementById('manual-status').value.trim();
+    const serial = document.getElementById('manual-serial').value.trim();
+    const statusFactura = document.getElementById('manual-stf').value.trim();
+    const fecha = document.getElementById('manual-fecha').value;
+    const pago = document.getElementById('manual-pago').checked;
+
+    if (!cedula || !nombre) return alert("Hermano, Cédula y Nombre son obligatorios.");
+
+    const transaccion = baseDatosLocal.transaction(["registros"], "readwrite");
+    transaccion.objectStore("registros").put({ cedula, nombre, status, serial, statusFactura, fecha, pago });
+
+    transaccion.oncomplete = function() {
+        mostrarNotificacion(`Persona [${cedula}] guardada.`, "success");
+        renderizarTablaDesdeDB();
+        document.getElementById('manual-cedula').value = "";
+        document.getElementById('manual-nombre').value = "";
+        cerrarTodosLosDrawers();
+    };
 }
 
-function toggleDrawer(idDrawer) {
-    const panel = document.getElementById(idDrawer);
-    const overlay = document.getElementById('drawer-overlay');
-    if (!panel) return;
-    const estaCerrado = panel.classList.contains('translate-x-full') || panel.classList.contains('-translate-x-full');
-    
-    cerrarTodosLosDrawers();
+function moverAPapelera(cedulaKey) {
+    const txLectura = baseDatosLocal.transaction(["registros"], "readonly");
+    txLectura.objectStore("registros").get(cedulaKey).onsuccess = function(e) {
+        const registroOriginal = e.target.result;
+        if (!registroOriginal) return;
 
-    if (estaCerrado) {
-        if (idDrawer === 'drawer-importar') panel.classList.remove('translate-x-full');
-        else panel.classList.remove('-translate-x-full');
-        if (overlay) {
-            overlay.classList.remove('hidden');
-            setTimeout(() => overlay.classList.add('opacity-100'), 10);
+        const txEscritura = baseDatosLocal.transaction(["registros", "registros_eliminados"], "readwrite");
+        txEscritura.objectStore("registros_eliminados").put(registroOriginal);
+        txEscritura.objectStore("registros").delete(cedulaKey);
+
+        txEscritura.oncomplete = function() {
+            mostrarNotificacion(`Registro ${cedulaKey} movido a la papelera.`, "error");
+            renderizarTablaDesdeDB();
+        };
+    };
+}
+
+function restaurarDesdePapelera(cedulaKey) {
+    const txLectura = baseDatosLocal.transaction(["registros_eliminados"], "readonly");
+    txLectura.objectStore("registros_eliminados").get(cedulaKey).onsuccess = function(e) {
+        const registro = e.target.result;
+        if (!registro) return;
+
+        const txRestaurar = baseDatosLocal.transaction(["registros", "registros_eliminados"], "readwrite");
+        txRestaurar.objectStore("registros").put(registro);
+        txRestaurar.objectStore("registros_eliminados").delete(cedulaKey);
+
+        txRestaurar.oncomplete = function() {
+            mostrarNotificacion(`Registro ${cedulaKey} restaurado.`, "success");
+            renderizarTablaDesdeDB();
+            renderizarPapelera();
+        };
+    };
+}
+
+function renderizarPapelera() {
+    const contenedor = document.getElementById('lista-papelera');
+    contenedor.innerHTML = "";
+    const tx = baseDatosLocal.transaction(["registros_eliminados"], "readonly");
+    let listadoHtml = ""; let totalBorrados = 0;
+
+    tx.objectStore("registros_eliminados").openCursor().onsuccess = function(e) {
+        const cursor = e.target.result;
+        if (cursor) {
+            totalBorrados++; const item = cursor.value;
+            listadoHtml += `
+                <div class="p-2 bg-slate-50 border border-slate-200 rounded-lg flex justify-between items-center gap-2">
+                    <div class="truncate flex-1">
+                        <p class="font-bold text-slate-800 text-xs">V-${item.cedula}</p>
+                        <p class="text-gray-500 text-[11px] truncate">${item.nombre}</p>
+                    </div>
+                    <button onclick="restaurarDesdePapelera('${item.cedula}')" class="bg-emerald-600 hover:bg-emerald-700 text-white text-[10px] font-bold px-2 py-1 rounded cursor-pointer">Restaurar</button>
+                </div>`;
+            cursor.continue();
+        } else {
+            contenedor.innerHTML = totalBorrados === 0 ? `<p class="italic text-gray-400 text-center py-4">La papelera está vacía, hermano.</p>` : listadoHtml;
         }
-    }
+    };
 }
 
-function cerrarTodosLosDrawers() {
-    const dImp = document.getElementById('drawer-importar');
-    const dComp = document.getElementById('drawer-comparar');
-    const dUsu = document.getElementById('drawer-usuarios');
-    if (dImp) dImp.classList.add('translate-x-full');
-    if (dComp) dComp.classList.add('-translate-x-full');
-    if (dUsu) dUsu.classList.add('-translate-x-full');
-    
-    const overlay = document.getElementById('drawer-overlay');
-    if (overlay) {
-        overlay.classList.remove('opacity-100');
-        setTimeout(() => overlay.classList.add('hidden'), 30);
-    }
-}
-
-function cambiarPestanaInterna(tipo) {
-    const btnForm = document.getElementById('tab-btn-form');
-    const btnTrash = document.getElementById('tab-btn-trash');
-    const conForm = document.getElementById('contenido-tab-form');
-    const conTrash = document.getElementById('contenido-tab-trash');
-
-    if (tipo === 'form') {
-        if(btnForm) btnForm.className = "flex-1 py-2 text-center border-b-2 border-slate-800 text-slate-800 cursor-pointer font-bold";
-        if(btnTrash) btnTrash.className = "flex-1 py-2 text-center border-b-2 border-transparent text-gray-400 hover:text-gray-600 cursor-pointer";
-        if(conForm) conForm.classList.remove('hidden');
-        if(conTrash) conTrash.classList.add('hidden');
-    } else {
-        if(btnTrash) btnTrash.className = "flex-1 py-2 text-center border-b-2 border-slate-800 text-slate-800 cursor-pointer font-bold";
-        if(btnForm) btnForm.className = "flex-1 py-2 text-center border-b-2 border-transparent text-gray-400 hover:text-gray-600 cursor-pointer";
-        if(conTrash) conTrash.classList.remove('hidden');
-        if(conForm) conForm.classList.add('hidden');
+function vaciarPapeleraPorCompleto() {
+    if (!confirm("Hermano, ¿seguro que quieres purgar la papelera definitivamente?")) return;
+    baseDatosLocal.transaction(["registros_eliminados"], "readwrite").objectStore("registros_eliminados").clear().onsuccess = function() {
+        mostrarNotificacion("Papelera purgada.", "success");
         renderizarPapelera();
-    }
+    };
 }
 
 function renderizarTablaDesdeDB() {
     const tbody = document.getElementById('tabla-registros');
-    if (!tbody || !baseDatosLocal) return;
     tbody.innerHTML = "";
     const transaccion = baseDatosLocal.transaction(["registros"], "readonly");
     let total = 0;
@@ -284,19 +370,20 @@ function renderizarTablaDesdeDB() {
             total++; const item = cursor.value;
             const tr = document.createElement('tr');
             tr.className = "hover:bg-slate-50 transition text-gray-700";
+            
             const claseOcultarBorrado = modoEliminacionActivo ? "" : "hidden";
 
             tr.innerHTML = `
                 <td class="p-3 font-bold text-indigo-950 bg-indigo-50/40">${item.cedula}</td>
-                <td class="p-2"><input type="text" id="nom-${item.cedula}" value="${item.nombre}" class="w-full p-1 border rounded text-xs bg-transparent"></td>
-                <td class="p-2"><input type="text" id="sta-${item.cedula}" value="${item.status}" class="w-full p-1 border rounded text-xs bg-transparent"></td>
-                <td class="p-2"><input type="text" id="ser-${item.cedula}" value="${item.serial}" class="w-full p-1 border rounded text-xs bg-transparent"></td>
-                <td class="p-2"><input type="text" id="stf-${item.cedula}" value="${item.statusFactura}" class="w-full p-1 border rounded text-xs bg-transparent"></td>
-                <td class="p-2"><input type="text" id="fec-${item.cedula}" value="${item.fecha}" class="w-full p-1 border rounded text-xs bg-transparent"></td>
-                <td class="p-2 text-center"><input type="checkbox" id="pag-${item.cedula}" ${item.pago ? 'checked' : ''} class="w-5 h-5 cursor-pointer"></td>
-                <td class="p-2 text-center flex items-center justify-center gap-1">
-                    <button onclick="guardarEdicionFila('${item.cedula}')" class="bg-indigo-600 text-white px-2.5 py-1 rounded text-xs cursor-pointer">💾</button>
-                    <button onclick="moverAPapelera('${item.cedula}')" class="btn-borrar-dinamico ${claseOcultarBorrado} bg-rose-600 text-white px-2 py-1 rounded text-xs cursor-pointer">🗑️</button>
+                <td class="p-2"><input type="text" id="nom-${item.cedula}" value="${item.nombre}" class="w-full p-1 border border-gray-200 rounded text-xs bg-transparent focus:bg-white focus:border-indigo-500"></td>
+                <td class="p-2"><input type="text" id="sta-${item.cedula}" value="${item.status}" class="w-full p-1 border border-gray-200 rounded text-xs bg-transparent focus:bg-white focus:border-indigo-500"></td>
+                <td class="p-2"><input type="text" id="ser-${item.cedula}" value="${item.serial}" class="w-full p-1 border border-gray-200 rounded text-xs bg-transparent focus:bg-white focus:border-indigo-500"></td>
+                <td class="p-2"><input type="text" id="stf-${item.cedula}" value="${item.statusFactura}" class="w-full p-1 border border-gray-200 rounded text-xs bg-transparent focus:bg-white focus:border-indigo-500"></td>
+                <td class="p-2"><input type="text" id="fec-${item.cedula}" value="${item.fecha}" class="w-full p-1 border border-gray-200 rounded text-xs bg-transparent focus:bg-white focus:border-indigo-500"></td>
+                <td class="p-2 text-center"><input type="checkbox" id="pag-${item.cedula}" ${item.pago ? 'checked' : ''} class="w-5 h-5 text-indigo-600 border-gray-300 rounded cursor-pointer mt-1"></td>
+                <td class="p-2 text-center flex items-center justify-center gap-1 min-w-[70px]">
+                    <button onclick="guardarEdicionFila('${item.cedula}')" class="bg-indigo-600 hover:bg-indigo-700 text-white px-2.5 py-1 rounded text-xs font-semibold transition shadow cursor-pointer" title="Guardar cambios">💾</button>
+                    <button onclick="moverAPapelera('${item.cedula}')" class="btn-borrar-dinamico ${claseOcultarBorrado} bg-rose-600 hover:bg-rose-700 text-white px-2 py-1 rounded text-xs font-semibold transition shadow cursor-pointer animate-fade-in" title="Eliminar y enviar a papelera">🗑️</button>
                 </td>
             `;
             tbody.appendChild(tr);
@@ -318,68 +405,7 @@ function guardarEdicionFila(cedulaKey) {
         fecha: document.getElementById(`fec-${cedulaKey}`).value,
         pago: document.getElementById(`pag-${cedulaKey}`).checked
     });
-    transaccion.oncomplete = function() { mostrarNotificacion(`Cédula ${cedulaKey} actualizada.`, "success"); };
-}
-
-function guardarPersonaManual() {
-    const cedula = document.getElementById('manual-cedula').value.trim();
-    const nombre = document.getElementById('manual-nombre').value.trim();
-    const status = document.getElementById('manual-status').value.trim();
-    const serial = document.getElementById('manual-serial').value.trim();
-    const statusFactura = document.getElementById('manual-stf').value.trim();
-    const fecha = document.getElementById('manual-fecha').value;
-    const pago = document.getElementById('manual-pago').checked;
-
-    if (!cedula || !nombre) return alert("Cédula y Nombre requeridos.");
-    const transaccion = baseDatosLocal.transaction(["registros"], "readwrite");
-    transaccion.objectStore("registros").put({ cedula, nombre, status, serial, statusFactura, fecha, pago });
     transaccion.oncomplete = function() {
-        mostrarNotificacion(`Guardado de forma manual.`, "success");
-        renderizarTablaDesdeDB();
-        cerrarTodosLosDrawers();
-    };
-}
-
-function moverAPapelera(cedulaKey) {
-    const txLectura = baseDatosLocal.transaction(["registros"], "readonly");
-    txLectura.objectStore("registros").get(cedulaKey).onsuccess = function(e) {
-        const reg = e.target.result; if (!reg) return;
-        const txEscritura = baseDatosLocal.transaction(["registros", "registros_eliminados"], "readwrite");
-        txEscritura.objectStore("registros_eliminados").put(reg);
-        txEscritura.objectStore("registros").delete(cedulaKey);
-        txEscritura.oncomplete = function() { renderizarTablaDesdeDB(); };
-    };
-}
-
-function restaurarDesdePapelera(cedulaKey) {
-    const txLectura = baseDatosLocal.transaction(["registros_eliminados"], "readonly");
-    txLectura.objectStore("registros_eliminados").get(cedulaKey).onsuccess = function(e) {
-        const reg = e.target.result; if (!reg) return;
-        const txRestaurar = baseDatosLocal.transaction(["registros", "registros_eliminados"], "readwrite");
-        txRestaurar.objectStore("registros").put(reg);
-        txRestaurar.objectStore("registros_eliminados").delete(cedulaKey);
-        txRestaurar.oncomplete = function() { renderizarTablaDesdeDB(); renderizarPapelera(); };
-    };
-}
-
-function renderizarPapelera() {
-    const contenedor = document.getElementById('lista-papelera'); if(!contenedor) return;
-    contenedor.innerHTML = "";
-    const tx = baseDatosLocal.transaction(["registros_eliminados"], "readonly");
-    let h = ""; let t = 0;
-    tx.objectStore("registros_eliminados").openCursor().onsuccess = function(e) {
-        const cursor = e.target.result;
-        if (cursor) {
-            t++; const item = cursor.value;
-            h += `<div class="p-2 bg-slate-50 border rounded-lg flex justify-between items-center"><div><p class="font-bold">V-${item.cedula}</p><p class="text-gray-500">${item.nombre}</p></div><button onclick="restaurarDesdePapelera('${item.cedula}')" class="bg-emerald-600 text-white text-[10px] px-2 py-1 rounded">Restaurar</button></div>`;
-            cursor.continue();
-        } else { contenedor.innerHTML = t === 0 ? `<p class="italic text-center py-4 text-gray-400">Papelera vacía.</p>` : h; }
-    };
-}
-
-function vaciarPapeleraPorCompleto() {
-    if (!confirm("¿Deseas vaciar la papelera?")) return;
-    baseDatosLocal.transaction(["registros_eliminados"], "readwrite").objectStore("registros_eliminados").clear().onsuccess = function() {
-        renderizarPapelera();
+        mostrarNotificacion(`Cambios guardados en Cédula ${cedulaKey}`, "success");
     };
 }
