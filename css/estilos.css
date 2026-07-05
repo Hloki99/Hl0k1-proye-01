@@ -1,40 +1,29 @@
 /* css/estilos.css */
 
-/* ==========================================================================
-   1. CONFIGURACIÓN DE FUENTES Y BASE
-   ========================================================================== */
-@layer base {
-    body {
-        /* Intenta usar Arial o las tipografías limpias por defecto del sistema */
-        font-family: Arial, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-        -webkit-font-smoothing: antialiased;
-        -moz-osx-font-smoothing: grayscale;
-    }
+/* Ajustes base globales */
+body {
+    font-family: Arial, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
 }
 
-/* ==========================================================================
-   2. ANIMACIONES PARA LA INTERFAZ
-   ========================================================================== */
-/* Animación suave para cuando aparece el botón de la papelera (🗑️) */
-@keyframes fadeInScale {
+/* Efecto visual suave de aparición para las filas cargadas dinámicamente */
+@keyframes filaAparecer {
     from {
         opacity: 0;
-        transform: scale(0.85);
+        transform: translateY(4px);
     }
     to {
         opacity: 1;
-        transform: scale(1);
+        transform: translateY(0);
     }
 }
 
-.btn-borrar-dinamico {
-    animation: fadeInScale 0.2s ease-out forwards;
+.animar-fila {
+    animation: filaAparecer 0.25s ease-out forwards;
 }
 
-/* ==========================================================================
-   3. PERSONALIZACIÓN DE SCROLLBARS (PANELES Y TABLA)
-   ========================================================================== */
-/* Hace que las barras de desplazamiento en los Drawers y la Tabla se vean delgadas y modernas */
+/* Diseño moderno y discreto para los scrollbars internos de la tabla */
 ::-webkit-scrollbar {
     width: 6px;
     height: 6px;
@@ -44,28 +33,17 @@
     background: transparent;
 }
 
-/* Color gris sutil para el fondo del scroll, a tono con Slate de Tailwind */
 ::-webkit-scrollbar-thumb {
-    background: #cbd5e1; /* slate-300 */
+    background: #cbd5e1; /* Color Slate-300 de Tailwind */
     border-radius: 4px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-    background: #94a3b8; /* slate-400 */
+    background: #94a3b8; /* Color Slate-400 de Tailwind */
 }
 
-/* ==========================================================================
-   4. DETALLES ADICIONALES DE MEJORA VISUAL
-   ========================================================================== */
-/* Evita que los inputs de la tabla deformen las celdas al hacer foco */
-input[type="text"]:focus,
-input[type="date"]:focus {
+/* Evita distorsiones en los campos del formulario al ganar foco */
+input:focus, select:focus {
     outline: none;
-    box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.2); /* Sutil brillo índigo */
-}
-
-/* Estilo para cuando se arrastra un archivo sobre el contenedor de Excel */
-.drag-over {
-    border-color: #4f46e5; /* indigo-600 */
-    background-color: rgba(79, 70, 229, 0.05);
+    box-shadow: 0 0 0 2px rgba(99, 102, 241, 0.2);
 }
